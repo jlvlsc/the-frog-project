@@ -975,10 +975,10 @@ right to a refund or chargeback once a transaction is processed.
             };
 
             window.__frogSpaceFrogDownloadApk = window.__frogSpaceFrogDownloadApk || function() {
-                const downloadUrl = 'https://github.com/jlvlsc/Space-Frog/releases/download/v1.0.0/Space.Frog-android.apk';
+                const downloadUrl = 'https://github.com/jlvlsc/Space-Frog/releases/download/v1.0.0/Space_Frog.apk';
                 const a = document.createElement('a');
                 a.href = downloadUrl; a.rel = 'noopener noreferrer';
-                a.download = 'Space.Frog-android.apk';
+                a.download = 'Space_Frog.apk';
                 a.style.display = 'none';
                 document.body.appendChild(a); a.click(); a.remove();
                 setTimeout(() => { try { window.location.href = downloadUrl; } catch(_) {} }, 1500);
@@ -1091,7 +1091,7 @@ right to a refund or chargeback once a transaction is processed.
                 if (appName === 'SITE FROG') {
                     window.__frogSiteFrogDownloadExe ? window.__frogSiteFrogDownloadExe() : (window.location.href = 'https://github.com/jlvlsc/Space-Frog/releases/download/v1.0.0/Site.Frog_1.0.7_x64-setup.exe');
                 } else if (platform === 'apk') {
-                    window.__frogSpaceFrogDownloadApk ? window.__frogSpaceFrogDownloadApk() : (window.location.href = 'https://github.com/jlvlsc/Space-Frog/releases/download/v1.0.0/Space.Frog-android.apk');
+                    window.__frogSpaceFrogDownloadApk ? window.__frogSpaceFrogDownloadApk() : (window.location.href = 'https://github.com/jlvlsc/Space-Frog/releases/download/v1.0.0/Space_Frog.apk');
                 } else {
                     window.__frogSpaceFrogDownloadExe ? window.__frogSpaceFrogDownloadExe() : (window.location.href = 'https://github.com/jlvlsc/Space-Frog/releases/download/v1.0.0/Space.Frog-Setup-2.1.0.exe');
                 }
