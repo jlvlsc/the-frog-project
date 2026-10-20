@@ -2,7 +2,7 @@
 <html lang="en" class="scroll-smooth snap-y snap-mandatory dark">
 <head>
     <script>
-        // Maintenance mode toggle (code-only). Default: ON.
+        // Maintenance mode toggle (code-only). Default: OFF (2026-09-16: apps updating — downloads locked instead).
         const MAINTENANCE_MODE = false;
         if (MAINTENANCE_MODE) {
             window.location.replace('./maintenance.html');
@@ -607,6 +607,11 @@
         // --- Updates / What's New Feature ---
         const websiteUpdates = [
             {
+                date: "2026-10-21", // Format: YYYY-MM-DD
+                title: "Version Aristotle Release & Specs Frog v1.0.0",
+                description: "Space Frog and Site Frog are upgraded to Version Aristotle. Specs Frog v1.0.0 is officially revealed with Smart BOQ builder, Construction Schedule, Manpower Schedule, Automated weekly material prices update, Smart Analytics, and GANTT charts. App binaries are currently uploading."
+            },
+            {
                 date: "2026-08-13", // Format: YYYY-MM-DD
                 title: "Space Frog for Android update!",
                 description: "Space Frog for Android now syncs its data and AI knowledge with the Windows version, using synced computations from the proper Windows build. It is now officially cross-platform — saved `.frog` files can be loaded whether you're on Android or Windows."
@@ -921,6 +926,12 @@
         // Terms-gating entrypoint for Space Frog downloads
             window.__frogTcStartDownload = window.__frogTcStartDownload || function(appName){
                 if (appName !== 'SPACE FROG' && appName !== 'SITE FROG') return;
+
+                // 2026-09-16: apps updating — downloads locked (override: __frogSetDownloadsLocked(false)).
+                if (window.__frogDownloadsLocked && window.__frogDownloadsLocked()) {
+                    if (typeof handleDownload === 'function') handleDownload(appName);
+                    return;
+                }
 
                 // Ensure closing braces are preserved (avoid template literal/try/finally mismatch bugs)
 
@@ -1506,13 +1517,32 @@
         });
 
         // Mock Download Handler
+        // 2026-09-16: apps updating — downloads locked by default. Override:
+        //   window.__frogSetDownloadsLocked(false)
+        window.__frogDownloadsLocked = window.__frogDownloadsLocked || function() {
+            try { return localStorage.getItem('frogDownloadLocked') !== 'false'; }
+            catch (e) { return true; }
+        };
+        window.__frogSetDownloadsLocked = window.__frogSetDownloadsLocked || function(locked) {
+            try { localStorage.setItem('frogDownloadLocked', locked ? 'true' : 'false'); } catch (e) {}
+            return window.__frogDownloadsLocked();
+        };
         let toastTimeout;
         function handleDownload(appName) {
             const toast = document.getElementById('downloadToast');
             const title = document.getElementById('toastTitle');
-            
-            title.innerText = `Downloading ${appName}...`;
-            toast.classList.remove('translate-y-20', 'opacity-0');
+
+            if (window.__frogDownloadsLocked && window.__frogDownloadsLocked()) {
+                if (title) title.innerText = 'Updating apps — downloads paused, back shortly.';
+                if (toast) toast.classList.remove('translate-y-20', 'opacity-0');
+                clearTimeout(toastTimeout);
+                toastTimeout = setTimeout(() => {
+                    if (toast) toast.classList.add('translate-y-20', 'opacity-0');
+                }, 3000);
+                return;
+            }
+            if (title) title.innerText = `Downloading ${appName}...`;
+            if (toast) toast.classList.remove('translate-y-20', 'opacity-0');
             
                 // Trigger actual download for SPACE FROG (same-tab)
             if (appName === 'SPACE FROG') {

@@ -2,7 +2,7 @@
 <html lang="en" class="scroll-smooth dark">
 <head>
     <script>
-        // Maintenance mode toggle (code-only). Default: ON.
+        // Maintenance mode toggle (code-only). Default: OFF (2026-09-16: apps updating — downloads locked instead).
         const MAINTENANCE_MODE = false;
         if (MAINTENANCE_MODE) {
             window.location.replace('./maintenance.html');
@@ -86,6 +86,11 @@
     </style>
 </head>
 <body class="bg-[#0F1319] text-white transition-colors duration-300">
+    <!-- Admin entry (inconspicuous top-left lock → admin console login) -->
+    <a href="./admin.html" title="Admin" aria-label="Admin console"
+       class="fixed top-2 left-2 z-[60] w-7 h-7 flex items-center justify-center rounded-lg text-white/20 hover:text-frog hover:bg-white/5 transition-all duration-200">
+        <i class="ph-bold ph-lock-key text-sm"></i>
+    </a>
     <canvas id="bgCanvas" class="fixed inset-0 z-[-1] pointer-events-none opacity-40"></canvas>
 
     <!-- Background blobs -->

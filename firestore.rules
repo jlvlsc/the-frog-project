@@ -11,6 +11,15 @@ service cloud.firestore {
       allow create, update, delete: if request.auth != null && request.auth.uid == 'updates-admin';
     }
 
+    // Compliance codex overrides: keeper edits via admin console (same UID gate
+    // as updates). NOTE: the console talks to the archfrogunified Firestore —
+    // paste this same block into that project's rules in the Firebase console.
+    match /codexOverrides/{fileId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null
+        && (request.auth.uid == 'updates-admin' || request.auth.token.admin == true);
+    }
+
     // Everything else locked
     match /{document=**} {
       allow read, write: if false;

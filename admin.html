@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Console – The Frog Project</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com https://www.gstatic.com https://*.firebaseio.com https://*.firebasedatabase.app; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com; font-src 'self' https://unpkg.com https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://chizysgqkyuadxetldkg.supabase.co https://firebaseinstallations.googleapis.com https://*.firebaseio.com https://*.firebasedatabase.app wss://*.firebaseio.com wss://*.firebasedatabase.app https://*.googleapis.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://www.gstatic.com;">
+    <meta name="referrer" content="strict-origin-when-cross-origin">
+    <meta http-equiv="X-Content-Type-Options" content="nosniff">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/@phosphor-icons/web@2.1.1/dist/index.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-display { font-family: 'Space Grotesk', sans-serif; }
+        .tabbtn.on { background: #B4F02A; color: #0F1319; }
+        .rowcard { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 10px 12px; }
+        .abtn { padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .abtn-ok { background: #2ecc71; color: #06281c; }
+        .abtn-no { background: transparent; border: 1px solid rgba(255,255,255,0.25); color: #fff; }
+        .abtn:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
+</head>
+<body class="bg-[#0F1319] text-white min-h-screen">
+    <nav class="w-full border-b border-white/5 px-6 py-4 flex justify-between items-center">
+        <a href="./portfolio.html" class="font-display font-bold tracking-[0.2em] text-sm">THE FROG PROJECT <span class="text-[#B4F02A]">/ ADMIN</span></a>
+        <button id="logoutBtn" class="hidden abtn abtn-no" onclick="FrogAdmin.logout()">Sign out</button>
+    </nav>
+    <main class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        <!-- Login (same Firebase-account password gate as other admin screens) -->
+        <section id="loginCard" class="max-w-md mx-auto mt-10 p-6 rounded-2xl border border-white/10 bg-white/5">
+            <h1 class="font-display text-xl font-bold mb-1">Admin sign in</h1>
+            <p class="text-xs text-gray-400 mb-4">Same credentials as your Firebase admin account. Session lasts 24h.</p>
+            <input id="adminUser" class="w-full mb-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10" placeholder="Admin username or email" autocomplete="username">
+            <input id="adminPass" type="password" class="w-full mb-3 px-3 py-2 rounded-lg bg-white/5 border border-white/10" placeholder="Password" autocomplete="current-password">
+            <button class="w-full abtn abtn-ok !py-2.5" onclick="FrogAdmin.login()">Sign in</button>
+            <p id="loginMsg" class="text-xs mt-2 text-red-300"></p>
+        </section>
+        <!-- Console -->
+        <section id="console" class="hidden">
+            <div class="flex flex-wrap gap-2 mb-4" id="tabs">
+                <button class="abtn tabbtn on" data-tab="pending">Pending accounts</button>
+                <button class="abtn tabbtn" data-tab="paid">Paid-unapproved</button>
+                <button class="abtn tabbtn" data-tab="upgrades">Upgrades + bundles</button>
+                <button class="abtn tabbtn" data-tab="users">Users</button>
+                <button class="abtn tabbtn" data-tab="audit">Audit</button>
+                <button class="abtn tabbtn" data-tab="codex">Codex</button>
+                <button class="abtn abtn-no ml-auto" onclick="FrogAdmin.refresh()">Refresh</button>
+            </div>
+            <p id="consoleMsg" class="text-xs text-gray-400 mb-3"></p>
+            <div id="tabBody" class="flex flex-col gap-2"></div>
+        </section>
+    </main>
+<script>
+(function () {
+    'use strict';
+    var ADMIN_FN = 'https://chizysgqkyuadxetldkg.supabase.co/functions/v1/admin-login';
+    var FROG_CONFIG = {
+        apiKey: 'AIzaSyCrEIflRdxmXh3bJZ3RnBBM_WVThFN02Cw',
+        authDomain: 'archfrogunified.firebaseapp.com',
+        databaseURL: 'https://archfrogunified-default-rtdb.asia-southeast1.firebasedatabase.app/',
+        projectId: 'archfrogunified'
+    };
+    var PLAN_DAYS = { '1mo': 30, '6mo': 180, '1yr': 365 };
+    var S = { token: null, expiresAt: 0, db: null, fs: null, tab: 'pending' };
+    function $(id) { return document.getElementById(id); }
+    function esc(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+    function msg(t) { var m = $('consoleMsg'); if (m) m.textContent = t || ''; }
+
+    async function ensureFirebase(customToken) {
+        if (!window.firebase) throw new Error('Firebase SDK missing');
+        var app = window.firebase.apps && window.firebase.apps.length ? window.firebase.app() : window.firebase.initializeApp(FROG_CONFIG);
+        // file:// origins have opaque origins + blocked storage (Tracking Prevention):
+        // use in-memory auth persistence so sign-in still works when testing locally.
+        try {
+            var pers = (location.protocol === 'file:')
+                ? window.firebase.auth.Auth.Persistence.NONE
+                : window.firebase.auth.Auth.Persistence.LOCAL;
+            await window.firebase.auth().setPersistence(pers);
+        } catch (e) { /* non-fatal */ }
+        if (customToken) { try { await window.firebase.auth().signInWithCustomToken(customToken); } catch (e) { /* maybe already signed */ } }
+        S.db = app.database();
+        try { S.fs = app.firestore(); } catch (e) { S.fs = null; }
+    }
+    function once(path) { return S.db.ref(path).once('value').then(function (s) { return s.val(); }); }
+
+    async function login() {
+        var u = $('adminUser').value.trim().toLowerCase();
+        var p = $('adminPass').value;
+        $('loginMsg').textContent = '';
+        if (!u || !p) { $('loginMsg').textContent = 'Username and password required.'; return; }
+        try {
+            var res = await fetch(ADMIN_FN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) });
+            var data = await res.json().catch(function () { return null; });
+            if (!res.ok || !data || !data.ok) throw new Error('Login HTTP ' + res.status + ': ' + ((data && (data.error || data.message)) || 'Login failed'));
+            S.token = data.token; S.expiresAt = data.expiresAt;
+            try { sessionStorage.setItem('frogAdmin', JSON.stringify({ u: u, exp: data.expiresAt })); } catch (e) {}
+            await ensureFirebase(data.firebaseCustomToken);
+            $('loginCard').classList.add('hidden');
+            $('console').classList.remove('hidden');
+            $('logoutBtn').classList.remove('hidden');
+            bindTabs();
+            await refresh();
+        } catch (e) { $('loginMsg').textContent = e.message || 'Login failed'; }
+    }
+    function logout() { try { sessionStorage.removeItem('frogAdmin'); } catch (e) {} try { window.firebase.auth().signOut(); } catch (e) {} location.reload(); }
+    function bindTabs() {
+        var tabs = document.querySelectorAll('#tabs .tabbtn[data-tab]');
+        tabs.forEach(function (b) {
+            b.onclick = function () {
+                tabs.forEach(function (x) { x.classList.remove('on'); });
+                b.classList.add('on');
+                S.tab = b.getAttribute('data-tab');
+                refresh();
+            };
+        });
+    }
+    async function refresh() {
+        msg('Loading…');
+        try {
+            if (S.tab === 'pending') await renderPending();
+            else if (S.tab === 'paid') await renderPaid();
+            else if (S.tab === 'upgrades') await renderUpgrades();
+            else if (S.tab === 'users') await renderUsers();
+            else if (S.tab === 'codex') await renderCodex();
+            else await renderAudit();
+        } catch (e) {
+            var detail = (e && e.code ? '[' + e.code + '] ' : '') + (e && e.message ? e.message : String(e));
+            msg('Load failed: ' + detail + ' — open DevTools Console (F12) for the full stack.');
+            console.error('[FrogAdmin] tab load failed:', e);
+        }
+    }
+
+    /* ---- Pending accounts: Site approvals + Space pending + Spec pending users ---- */
+    async function renderPending() {
+        var html = [];
+        var approvals = (await once('approvals')) || {};
+        Object.keys(approvals).forEach(function (k) {
+            var r = approvals[k] || {};
+            if (r.status !== 'pending') return;
+            html.push(row('SITE', esc(r.username || k) + ' · ' + esc(r.email || ''), 'site-appr:' + k,
+                '<button class="abtn abtn-ok" onclick="FrogAdmin.siteApprove(\'' + k.replace(/'/g, '') + '\',1)">Approve</button> <button class="abtn abtn-no" onclick="FrogAdmin.siteApprove(\'' + k.replace(/'/g, '') + '\',0)">Reject</button>'));
+        });
+        var pend = (await once('pendingSubmissions')) || {};
+        Object.keys(pend).forEach(function (id) {
+            var r = pend[id] || {};
+            html.push(row('SPACE', esc(r.username || '') + ' · ' + esc(r.tier || '') + ' · ' + esc(r.paymentStatus || 'unpaid'), 'space-pend:' + id,
+                '<button class="abtn abtn-ok" onclick="FrogAdmin.spaceApprove(\'' + id + '\')">Approve</button> <button class="abtn abtn-no" onclick="FrogAdmin.spaceReject(\'' + id + '\')">Reject</button>'));
+        });
+        if (S.fs) {
+            var snap = await S.fs.collection('users').where('status', '==', 'pending').get();
+            snap.forEach(function (d) {
+                var r = d.data() || {};
+                html.push(row('SPEC', esc(r.email || d.id) + ' · ' + esc(r.tier || 'free'), 'spec-user:' + d.id,
+                    '<button class="abtn abtn-ok" onclick="FrogAdmin.specSetStatus(\'' + d.id + '\',\'approved\')">Approve</button> <button class="abtn abtn-no" onclick="FrogAdmin.specSetStatus(\'' + d.id + '\',\'rejected\')">Reject</button>'));
+            });
+        }
+        paint(html, 'No pending accounts. Queues match in-app dashboards when empty.');
+    }
+    function row(app, main, tag, actions) {
+        return '<div class="rowcard flex flex-wrap items-center gap-2 justify-between"><div class="text-sm"><span class="text-[#B4F02A] font-bold text-xs mr-2">' + app + '</span>' + main + '<div class="text-[10px] text-gray-500">' + esc(tag) + '</div></div><div class="flex gap-2">' + actions + '</div></div>';
+    }
+    function paint(html, empty) { $('tabBody').innerHTML = html.length ? html.join('') : '<p class="text-sm text-gray-500">' + empty + '</p>'; msg(html.length + ' row(s).'); }
+
+    /* ---- Paid-unapproved: payments paid + record still pending ---- */
+    async function renderPaid() {
+        var html = [];
+        var pays = (await once('payments')) || {};
+        var pend = (await once('pendingSubmissions')) || {};
+        Object.keys(pays).forEach(function (id) {
+            var p = pays[id] || {};
+            if (p.status !== 'paid') return;
+            var sub = pend[id];
+            if (sub && sub.status !== 'approved') {
+                html.push(row('SPACE', esc(sub.username || id) + ' · PAID via ' + esc(p.paymentChannel || '?'), 'payments:' + id,
+                    '<button class="abtn abtn-ok" onclick="FrogAdmin.spaceApprove(\'' + id + '\')">Approve now</button>'));
+            }
+        });
+        var ups = (await once('upgrades')) || {};
+        Object.keys(ups).forEach(function (k) {
+            var u = ups[k] || {};
+            if (u.paidAt && u.status !== 'approved') {
+                html.push(row('SITE', esc(u.username || k) + ' · PAID ' + esc(u.tier || '') + '/' + esc(u.plan || ''), 'upgrades:' + k,
+                    '<button class="abtn abtn-ok" onclick="FrogAdmin.siteUpgrade(\'' + k.replace(/'/g, '') + '\',1)">Approve now</button>'));
+            }
+        });
+        paint(html, 'No paid-unapproved rows.');
+    }
+
+    /* ---- Upgrades + bundles queues ---- */
+    async function renderUpgrades() {
+        var html = [];
+        var ups = (await once('upgrades')) || {};
+        Object.keys(ups).forEach(function (k) {
+            var u = ups[k] || {};
+            if (u.status !== 'pending' && u.status !== 'renewal_pending') return;
+            html.push(row('SITE', esc(u.username || k) + ' · ' + esc(u.tier || '') + '/' + esc(u.plan || ''), 'upgrades:' + k,
+                '<button class="abtn abtn-ok" onclick="FrogAdmin.siteUpgrade(\'' + k.replace(/'/g, '') + '\',1)">Approve</button> <button class="abtn abtn-no" onclick="FrogAdmin.siteUpgrade(\'' + k.replace(/'/g, '') + '\',0)">Reject</button>'));
+        });
+        if (S.fs) {
+            var q1 = await S.fs.collection('upgradeRequests').where('status', '==', 'pending').get();
+            q1.forEach(function (d) {
+                var r = d.data() || {};
+                html.push(row('SPEC', esc(r.email || '') + ' · ' + esc(r.tier || '') + '/' + esc(r.plan || ''), 'upgradeRequests:' + d.id,
+                    '<button class="abtn abtn-ok" onclick="FrogAdmin.specUpgrade(\'' + d.id + '\')">Approve</button> <button class="abtn abtn-no" onclick="FrogAdmin.specUpgradeReject(\'' + d.id + '\')">Reject</button>'));
+            });
+            var q2 = await S.fs.collection('bundleRequests').where('status', '==', 'pending').get();
+            q2.forEach(function (d) {
+                var r = d.data() || {};
+                html.push(row('BUNDLE', esc(r.email || '') + ' · ' + esc(r.plan || '') + ' · ' + esc(r.app || ''), 'bundleRequests:' + d.id,
+                    '<button class="abtn abtn-ok" onclick="FrogAdmin.specBundle(\'' + d.id + '\')">Approve</button> <button class="abtn abtn-no" onclick="FrogAdmin.specBundleReject(\'' + d.id + '\')">Reject</button>'));
+            });
+        }
+        paint(html, 'No pending upgrades/bundles.');
+    }
+
+    /* ---- Users directory (search by email substring) ---- */
+    async function renderUsers() {
+        var q = (prompt('Search email contains (blank = first 50 Spec users + RTDB lists):', '') || '').toLowerCase();
+        var html = [];
+        if (S.fs) {
+            var snap = await S.fs.collection('users').limit(50).get();
+            snap.forEach(function (d) {
+                var r = d.data() || {};
+                if (q && String(r.email || '').toLowerCase().indexOf(q) < 0) return;
+                var exp = r.proExpiresAt && r.proExpiresAt.toDate ? r.proExpiresAt.toDate().toLocaleDateString() : '';
+                html.push(row('SPEC', esc(r.email || d.id) + ' · ' + esc(r.tier || '') + ' · ' + esc(r.status || '') + (exp ? ' · exp ' + exp : ''), 'users:' + d.id,
+                    '<button class="abtn abtn-no" onclick="FrogAdmin.specSetStatus(\'' + d.id + '\',\'suspended\')">Suspend</button>'));
+            });
+        }
+        var appr = (await once('approvedSubmissions')) || {};
+        Object.keys(appr).forEach(function (id) {
+            var r = appr[id] || {};
+            if (q && String(r.email || r.username || '').toLowerCase().indexOf(q) < 0) return;
+            html.push(row('SPACE', esc(r.username || id) + ' · ' + esc(r.tier || '') + ' · lease ' + esc(r.leaseDays || 0) + 'd', 'approvedSubmissions:' + id, ''));
+        });
+        paint(html, 'No users match.');
+    }
+
+    /* ---- Audit: payments + payEvents (read-only) ---- */
+    async function renderAudit() {
+        var html = [];
+        var pays = (await once('payments')) || {};
+        Object.keys(pays).slice(-50).reverse().forEach(function (id) {
+            var p = pays[id] || {};
+            html.push(row(esc((p.app || 'space').toUpperCase()), esc(p.username || p.email || id) + ' · ' + esc(p.tier || '') + '/' + esc(p.plan || '') + ' · ' + esc(p.status || ''), 'payments:' + id, ''));
+        });
+        paint(html, 'No payments recorded.');
+    }
+
+    /* ---- Writes (mirror in-app dashboard shapes; stamped paymongo-manual/admin) ---- */
+    async function siteApprove(key, ok) {
+        var ref = S.db.ref('approvals/' + key);
+        var snap = await ref.once('value');
+        if (!snap.exists()) return;
+        await ref.update(ok ? { status: 'approved', approved: true, rejected: false, updatedAt: Date.now() } : { status: 'rejected', approved: false, rejected: true, updatedAt: Date.now() });
+        refresh();
+    }
+    async function siteUpgrade(key, ok) {
+        var ref = S.db.ref('upgrades/' + key);
+        var snap = await ref.once('value');
+        var r = snap.val() || {};
+        if (!snap.exists()) return;
+        if (!ok) { await ref.update({ status: 'rejected', updatedAt: Date.now() }); refresh(); return; }
+        var days = PLAN_DAYS[r.plan] || 30;
+        var anchor = Number(r.approvedAt || r.updatedAt || r.requestedAt || 0);
+        var oldExpiry = anchor ? anchor + ((PLAN_DAYS[r.plan] || days) * 86400000) : 0;
+        await ref.update({ status: 'approved', approvedAt: oldExpiry > Date.now() ? oldExpiry : Date.now(), updatedAt: Date.now(), approvedBy: 'admin-console' });
+        refresh();
+    }
+    async function spaceApprove(id) {
+        var pref = S.db.ref('pendingSubmissions/' + id);
+        var snap = await pref.once('value');
+        var data = snap.val();
+        if (!data) return;
+        data.status = 'approved';
+        data.approvedAt = Date.now();
+        var plan = (data.plan && PLAN_DAYS[data.plan]) ? data.plan : '1mo';
+        data.leaseDays = (data.tier === 'Pro' || data.tier === 'ProPlus') ? PLAN_DAYS[plan] : 0;
+        data.approvedBy = 'admin-console';
+        var updates = {};
+        updates['approvedSubmissions/' + id] = data;
+        updates['pendingSubmissions/' + id] = null;
+        await S.db.ref().update(updates);
+        refresh();
+    }
+    async function spaceReject(id) {
+        await S.db.ref('pendingSubmissions/' + id).remove();
+        refresh();
+    }
+    async function specSetStatus(uid, status) {
+        if (!S.fs) return;
+        await S.fs.collection('users').doc(uid).update({ status: status, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        refresh();
+    }
+    async function specUpgrade(id) {
+        if (!S.fs) return;
+        var d = await S.fs.collection('upgradeRequests').doc(id).get();
+        var r = d.exists ? d.data() : {};
+        var days = PLAN_DAYS[r.plan] || 30;
+        var tier = r.tier === 'pro_plus' ? 'pro_plus' : 'pro';
+        var cur = await S.fs.collection('users').doc(r.uid).get();
+        var base = Date.now();
+        try {
+            var cd = cur.exists ? cur.data() : {};
+            var exp = cd.proExpiresAt && cd.proExpiresAt.toMillis ? cd.proExpiresAt.toMillis() : 0;
+            if (exp > base) base = exp;
+        } catch (e) {}
+        await S.fs.collection('users').doc(r.uid).set({ tier: tier, proExpiresAt: new Date(base + days * 86400000), updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        await S.fs.collection('upgradeRequests').doc(id).update({ status: 'approved', updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        refresh();
+    }
+    async function specUpgradeReject(id) {
+        if (!S.fs) return;
+        await S.fs.collection('upgradeRequests').doc(id).update({ status: 'rejected', updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        refresh();
+    }
+    async function specBundle(id) {
+        if (!S.fs) return;
+        var d = await S.fs.collection('bundleRequests').doc(id).get();
+        var r = d.exists ? d.data() : {};
+        var days = PLAN_DAYS[r.plan] || 30;
+        var key = r.uid || ('email:' + String(r.email || '').toLowerCase());
+        await S.fs.collection('bundles').doc(key).set({ tier: 'pro_plus', plan: r.plan, price: r.price || 0, status: 'approved', approvedAt: new Date(), expiresAt: new Date(Date.now() + days * 86400000), email: r.email || '', app: r.app || 'specfrog', updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+        await S.fs.collection('bundleRequests').doc(id).update({ status: 'approved', updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        refresh();
+    }
+    async function specBundleReject(id) {
+        if (!S.fs) return;
+        await S.fs.collection('bundleRequests').doc(id).update({ status: 'rejected', updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+        refresh();
+    }
+
+    /* ---- Codex: compliance data editor (Firestore codexOverrides/*) ----
+       Pinned snapshots ship inside web/EXE/APK. Overrides merge on top by
+       codexVersion. Keeper edits here, exports JSON, commits via sync-vendor.
+       Engine runtime merge: evaluate() options.codexOverrides (Node) — HTML
+       runtime Firestore merge is a follow-up (needs Firestore SDK in www). */
+    var CODEX_FILES = [
+        { id: 'space-types', file: 'space-types.json' },
+        { id: 'egress', file: 'egress.json' },
+        { id: 'accessibility', file: 'accessibility.json' },
+        { id: 'parking', file: 'parking.json' },
+        { id: 'nbcp-rules', file: 'nbcp-rules.json' }
+    ];
+    var CODEX_BASE_URL = 'https://jlvlsc-png.github.io/Space-Frog/codex/';
+    var CX = { file: 'space-types', base: null, override: null, baseUrl: CODEX_BASE_URL };
+    function cxGet(obj, path) {
+        var parts = String(path).split('.');
+        var cur = obj;
+        for (var i = 0; i < parts.length; i++) {
+            if (cur == null || typeof cur !== 'object') return undefined;
+            cur = cur[parts[i]];
+        }
+        return cur;
+    }
+    function cxSet(obj, path, val) {
+        var parts = String(path).split('.');
+        var cur = obj;
+        for (var i = 0; i < parts.length - 1; i++) {
+            if (cur[parts[i]] == null || typeof cur[parts[i]] !== 'object') cur[parts[i]] = {};
+            cur = cur[parts[i]];
+        }
+        cur[parts[parts.length - 1]] = val;
+    }
+    function cxMerge(base, over) {
+        if (Array.isArray(over) || typeof over !== 'object' || over === null) return over === undefined ? base : over;
+        var out = (base && typeof base === 'object' && !Array.isArray(base)) ? Object.assign({}, base) : {};
+        Object.keys(over).forEach(function (k) { out[k] = cxMerge(out[k], over[k]); });
+        return out;
+    }
+    function cxBump(v) {
+        var m = String(v || '1.0.0').split('.');
+        return (m[0] || '1') + '.' + ((parseInt(m[1] || '0', 10) || 0) + 1) + '.0';
+    }
+    // Curated editable fields per file: {path, label, kind, cite}
+    function cxSchema(fileId, base) {
+        var F = [];
+        var num = function (path, label, cite) { F.push({ path: path, label: label, kind: 'num', cite: cite }); };
+        var txt = function (path, label, cite) { F.push({ path: path, label: label, kind: 'text', cite: cite }); };
+        if (fileId === 'space-types') {
+            var types = (base && base.spaceTypes) || {};
+            Object.keys(types).sort().forEach(function (name) {
+                num('spaceTypes.' + name + '.fire.occupantLoadFactor', name + ' · factor', (types[name].nbc && types[name].nbc.occFactorCite) || '');
+                txt('spaceTypes.' + name + '.fire.loadBasis', name + ' · basis', '');
+            });
+        } else if (fileId === 'egress') {
+            ['allOthers', 'healthSprinklered', 'healthNonSprinklered', 'highHazard', 'boardAndCare'].forEach(function (g) {
+                num('capacityFactorsMmPerPerson.' + g + '.stair', g + ' stair mm/p', '§10.2.5.2(C) T1');
+                num('capacityFactorsMmPerPerson.' + g + '.level', g + ' level mm/p', '§10.2.5.2(C) T1');
+            });
+            ['anyMeansOfEgress', 'doorClear', 'doorPairMinOneLeaf', 'doorSingleLeafMax', 'stairUnder50', 'stairUnder2000', 'stairOver2000', 'rampClear', 'rampMaxSingleRunRiseMm'].forEach(function (k) {
+                num('minimumWidthsMm.' + k, 'min width · ' + k, '§10.2.5.x');
+            });
+            Object.keys((base && base.corridorsMm) || {}).forEach(function (k) {
+                num('corridorsMm.' + k + '.value', 'corridor · ' + k, ((base.corridorsMm || {})[k] || {}).cite || '');
+            });
+            num('travelMaxM.assembly.base', 'travel assembly', '§10.2.8.2E');
+            num('travelMaxM.assembly.sprinklered', 'travel assembly sprk', '§10.2.8.2E');
+            num('travelMaxM.business.base', 'travel business', '§10.2.16.2F');
+            num('travelMaxM.business.sprinklered', 'travel business sprk', '§10.2.16.2F');
+            num('travelMaxM.industrial.base', 'travel industrial', '§10.2.17.2F');
+            num('travelMaxM.industrial.sprinklered', 'travel industrial sprk', '§10.2.17.2F');
+            num('deadEndMaxM.general.value', 'dead-end general', '§10.2.5.2(I)');
+            num('deadEndMaxM.businessSprinklered.value', 'dead-end business sprk', '§10.2.16.2E');
+            num('stairs.riserMinMm', 'riser min', '§10.2.5.4 T2');
+            num('stairs.riserMaxMm', 'riser max', '§10.2.5.4 T2');
+            num('stairs.treadMinMm', 'tread min', '§10.2.5.4 T2');
+            num('stairs.guardMinM', 'guard min m', '§10.2.5.4H');
+            // Occupant-load factors (sqm/person) — engine-critical Table 1.
+            // Keys with objects ({value, cite}) vs bare numbers both handled.
+            Object.keys((base && base.occupantLoadFactors) || {}).forEach(function (k) {
+                if (k.charAt(0) === '_') return;
+                var entry = base.occupantLoadFactors[k] || {};
+                var cite = (entry && entry.cite) || '';
+                var sub = 'occupantLoadFactors.' + k;
+                // Numeric-valued entries edit directly; object entries edit .value.
+                if (typeof entry === 'number') num(sub, 'occ factor · ' + k, '');
+                else num(sub + '.value', 'occ factor · ' + k, cite);
+            });
+        } else if (fileId === 'accessibility') {
+            txt('ramps.maxGradientGeneral', 'ramp max gradient', 'Amended T-A.1.1');
+            txt('ramps.maxGradientSpecial', 'ramp special gradient', 'Amended T-A.1.1');
+            num('ramps.generalLandingIntervalM', 'landing interval general m', 'T-A.1.1');
+            num('ramps.specialCase.maxLengthM', 'special max length m', 'T-A.1.1');
+            num('ramps.specialCase.maxRiseMm', 'special max rise mm', 'T-A.1.1');
+            num('ramps.minClearWidthMm', 'ramp width mm', 'Rule III');
+            num('ramps.landingMinLengthMm', 'landing length mm', 'Rule III');
+            num('ramps.tactileDepthMm', 'tactile depth mm', 'Rule III');
+            num('doors.minClearWidthMm', 'door clear mm', 'Rule III');
+            num('corridors.minClearWidthMm', 'corridor mm', 'Rule III-amended');
+            num('corridors.turnaboutMm', 'turnabout mm', 'Rule III');
+            num('elevators.carDepthMm', 'elevator depth mm', 'Rule III');
+            num('elevators.carWidthMm', 'elevator width mm', 'Rule III');
+            num('elevators.doorClearMm', 'elevator door mm', 'Rule III');
+            num('stairs.riserMaxMm', 'stair riser max mm', 'Rule III');
+            num('stairs.treadMinMm', 'stair tread min mm', 'Rule III');
+            num('stairs.minClearWidthM', 'stair width m', 'Rule III');
+            num('parking.slotWidthMm', 'PWD slot w mm', 'T-A.6.1');
+            num('parking.slotLengthMm', 'PWD slot l mm', 'T-A.6.1');
+            num('parking.walkwayBetweenMm', 'walkway mm', 'T-A.6.1');
+            num('toilets.accessiblePerGenderedCount', 'accessible per N cubicles', 'Rule III');
+            num('toilets.cubicleMm', 'cubicle mm', 'Rule III');
+            num('toilets.seatHeightMm', 'seat mm', 'Rule III');
+            num('wheelchairSeatingAssembly.4to50', 'w-chair 4-50', 'Rule III');
+            num('wheelchairSeatingAssembly.51to300', 'w-chair 51-300', 'Rule III');
+            num('wheelchairSeatingAssembly.301to500', 'w-chair 301-500', 'Rule III');
+            num('wheelchairSeatingAssembly.over500Per100', 'w-chair +/100', 'Rule III');
+            num('counters.lowerMm', 'counter lower mm', 'Rule III');
+            num('switchesControlsMm.min', 'switch min mm', 'Rule III');
+            num('switchesControlsMm.max', 'switch max mm', 'Rule III');
+        } else if (fileId === 'nbcp-rules') {
+            ['rrow6to7m', 'rrow4to5m', 'rrow3mOrLess'].forEach(function (k) {
+                num('rrowBhlGate.' + k + '.storeys', 'BHL ' + k + ' storeys', 'Rule VIII');
+                num('rrowBhlGate.' + k + '.maxHeightM', 'BHL ' + k + ' meters', 'Rule VIII');
+            });
+            num('firewallCaps.construction.minFireRatingHrs', 'firewall rating hrs', 'Rule VII');
+            num('firewallCaps.construction.parapetAboveRoofMm', 'parapet mm', 'Rule VII');
+            num('firewallCaps.R-1.carportAbutmentMaxH', 'R-1 carport abut h', 'Rule VII');
+            num('courts.minWidth1to2StoreyM', 'court min m', '§804');
+            num('courts.incrementPerStoreyAbove2Mm', 'court +/storey mm', '§804');
+            num('courts.passagewayToStreetMinM', 'court passage m', '§804');
+            num('eaves.minFromSideRearMm', 'eaves mm', '§804/808');
+            num('egressWindow.minWidthMm', 'egress win w mm', '§808');
+            num('egressWindow.sillMaxMm', 'egress win sill mm', '§808');
+            num('stairsGeneral.over50MinWidthM', 'stair >50 m', 'Rule XII §1207');
+            num('stairsGeneral.upTo50MinWidthMm', 'stair ≤50 mm', 'Rule XII §1207');
+            num('stairsGeneral.riseMaxMm', 'stair rise max mm', 'Rule XII');
+            num('stairsGeneral.runMinMm', 'stair run min mm', 'Rule XII');
+            num('exitsTableXII.travelMaxM', 'travel max m', 'Table XII.1');
+            num('exitsTableXII.travelSprinkleredMaxM', 'travel sprk m', 'Table XII.1');
+            num('windows.minSqm', 'window min sqm', '§808');
+            num('airSpaceM3PerPerson.school.value', 'air school', '§807');
+            num('airSpaceM3PerPerson.workshopFactoryOffice.value', 'air office', '§807');
+            num('airSpaceM3PerPerson.habitable.value', 'air habitable', '§807');
+            num('airChanges.officeStoresRestaurantFactoryACH', 'ACH office', '§811');
+            num('airChanges.kitchenBakeryLaundryBoilerACH', 'ACH kitchen', '§811');
+            num('airChanges.assemblyM3PerMinPerPerson', 'assembly m³/min/p', '§811');
+            num('airChanges.wardDormitoryM3PerMinPerPerson', 'ward m³/min/p', '§811');
+            num('basement.minRrowM', 'basement RROW m', 'Rule VIII');
+        } else if (fileId === 'parking') {
+            num('computation.multiFloorGarageRadiusM', 'garage radius m', 'Table VII.4');
+            num('computation.offsiteMaxResidentialM', 'offsite resid m', 'Table VII.4');
+            num('computation.offsiteMaxOfficeCommercialM', 'offsite office m', 'Table VII.4');
+            txt('bp344Note', 'BP344 note', '');
+        }
+        return F;
+    }
+    async function renderCodex() {
+        if (!S.fs) { paint([], 'Codex needs Firestore (Spec project). Writes go to codexOverrides/*.'); return; }
+        var html = [];
+        html.push('<div class="rowcard"><div class="text-sm font-bold mb-2">Compliance codex overrides <span class="text-gray-500 font-normal">· pinned snapshots ship in apps · newer codexVersion wins</span></div>');
+        html.push('<div class="flex flex-wrap gap-2 items-center text-xs">');
+        html.push('<select id="cxFile" class="px-2 py-1 rounded bg-white/5 border border-white/10">' + CODEX_FILES.map(function (f) {
+            return '<option value="' + f.id + '"' + (CX.file === f.id ? ' selected' : '') + '>' + f.id + '</option>';
+        }).join('') + '</select>');
+        html.push('<input id="cxBaseUrl" class="px-2 py-1 rounded bg-white/5 border border-white/10" style="min-width:280px" value="' + esc(CX.baseUrl) + '" title="Base URL serving pinned codex/*.json">');
+        html.push('<button class="abtn abtn-ok" onclick="FrogAdmin.cxLoad()">Load base</button>');
+        html.push('<span id="cxMeta" class="text-gray-400"></span></div></div>');
+        html.push('<div id="cxGrid"></div>');
+        html.push('<div class="rowcard"><div class="flex flex-wrap gap-2 text-xs">'
+            + '<button class="abtn abtn-ok" onclick="FrogAdmin.cxSave()">Save override to Firestore</button>'
+            + '<button class="abtn" onclick="FrogAdmin.cxExport()">Export effective JSON</button>'
+            + '<button class="abtn abtn-no" onclick="FrogAdmin.cxDelete()">Delete override</button>'
+            + '<span id="cxMsg" class="text-gray-400"></span></div>'
+            + '<p class="text-[11px] text-gray-500 mt-2">Flow: edit → Save override → Export effective JSON → commit into shared/compliance-engine/codex → run sync-vendor → rebuild EXE/APK. Parking ratios array is read-only here (edit via raw export); overrides replace arrays wholesale on merge.</p></div>');
+        $('tabBody').innerHTML = html.join('');
+        $('cxFile').onchange = function () { CX.file = $('cxFile').value; CX.base = null; CX.override = null; $('cxGrid').innerHTML = ''; $('cxMeta').textContent = ''; };
+        if (CX.base) cxPaintGrid();
+    }
+    async function cxLoadBase() {
+        var url = $('cxBaseUrl').value.replace(/\/$/, '') + '/';
+        CX.baseUrl = url;
+        var meta = CODEX_FILES.filter(function (f) { return f.id === CX.file; })[0];
+        var res = await fetch(url + meta.file);
+        if (!res.ok) throw new Error('Base fetch HTTP ' + res.status + ' — check base URL or paste JSON below.');
+        CX.base = await res.json();
+        var snap = await S.fs.collection('codexOverrides').doc(CX.file).get();
+        CX.override = snap.exists ? snap.data() : null;
+        return meta;
+    }
+    function cxEffective() {
+        if (!CX.base) return null;
+        var data = (CX.override && CX.override.data) || {};
+        return cxMerge(CX.base, data);
+    }
+    async function cxLoad() {
+        msg('Loading codex base…');
+        try {
+            await cxLoadBase();
+            cxPaintGrid();
+            msg('Base loaded.');
+        } catch (e) { msg('Load failed: ' + (e && e.message ? e.message : e)); }
+    }
+    function cxPaintGrid() {
+        var eff = cxEffective();
+        var schema = cxSchema(CX.file, CX.base);
+        var rows = schema.map(function (f, i) {
+            var baseV = cxGet(CX.base, f.path);
+            var effV = cxGet(eff, f.path);
+            var shown = effV === undefined ? '' : (typeof effV === 'object' ? JSON.stringify(effV) : String(effV));
+            var inp = f.kind === 'num'
+                ? '<input data-cx="' + i + '" type="number" step="any" value="' + esc(shown) + '" class="px-2 py-1 rounded bg-white/5 border border-white/10" style="width:130px">'
+                : '<input data-cx="' + i + '" type="text" value="' + esc(shown) + '" class="px-2 py-1 rounded bg-white/5 border border-white/10" style="min-width:200px">';
+            var flag = (CX.override && JSON.stringify(cxGet(CX.override.data || {}, f.path)) !== undefined && JSON.stringify(cxGet(CX.override.data || {}, f.path)) !== JSON.stringify(baseV)) ? ' <span class="text-[#B4F02A]">●</span>' : '';
+            return '<tr class="border-t border-white/10"><td class="py-1 pr-2 text-xs">' + esc(f.label) + flag + '<div class="text-[10px] text-gray-500">' + esc(f.path) + (f.cite ? ' · ' + esc(f.cite) : '') + '</div></td>'
+                + '<td class="py-1 pr-2 text-[11px] text-gray-500">' + esc(baseV === undefined ? '—' : (typeof baseV === 'object' ? JSON.stringify(baseV) : String(baseV))) + '</td>'
+                + '<td class="py-1">' + inp + '</td></tr>';
+        });
+        var ver = 'base ' + esc((CX.base && (CX.base.codexVersion || CX.base.version)) || '?')
+            + (CX.override ? ' · override ' + esc(CX.override.codexVersion || '?') + ' by ' + esc(CX.override.updatedBy || '?') : ' · no override');
+        $('cxMeta').textContent = ver;
+        var extra = '';
+        if (CX.file === 'parking') {
+            var ratios = ((CX.base && CX.base.ratios) || []).map(function (r) {
+                return '<tr class="border-t border-white/10"><td class="py-1 pr-2 text-xs">' + esc(r.use) + '</td><td class="py-1 text-xs">' + esc(r.ratio) + (r.verify ? ' <span class="text-yellow-300">⚠ verify</span>' : '') + '</td></tr>';
+            });
+            extra = '<div class="rowcard mt-2"><div class="text-sm font-bold mb-2">Table VII.4 ratios (read-only — override via raw export)</div><table>' + ratios.join('') + '</table></div>';
+        }
+        $('cxGrid').innerHTML = '<div class="rowcard"><table><thead><tr class="text-left text-[11px] text-gray-400"><th>Field (● = overridden)</th><th>Pinned base</th><th>Effective (edit me)</th></tr></thead><tbody>' + rows.join('') + '</tbody></table></div>' + extra;
+        CX._schema = schema;
+    }
+     function cxCollect() {
+        var schema = CX._schema || [];
+        var partial = {};
+        var errors = [];
+        var leafCount = 0;
+        schema.forEach(function (f, i) {
+            var el = document.querySelector('[data-cx="' + i + '"]');
+            if (!el) return;
+            var raw = el.value;
+            if (raw === '') return; // blank = leave at base (no override for this field)
+            if (f.kind === 'num') {
+                var n = Number(raw);
+                if (!isFinite(n) || n < 0) { errors.push(f.label + ' must be a number ≥ 0'); return; }
+                cxSet(partial, f.path, n);
+                leafCount++;
+            } else {
+                // Gradient fields must look like 1:20 — a typo here would silently
+                // poison every downstream computation on merge.
+                if (/gradient/i.test(f.path) && !/^\d+\s*:\s*\d+$/.test(raw)) {
+                    errors.push(f.label + ' must look like 1:20');
+                    return;
+                }
+                cxSet(partial, f.path, raw);
+                leafCount++;
+            }
+        });
+        return { partial: partial, errors: errors, leafCount: leafCount };
+    }
+    async function cxSave() {
+        var m = $('cxMsg'); m.textContent = '';
+        if (!CX.base) { m.textContent = 'Load base first.'; return; }
+        var c = cxCollect();
+        if (c.errors.length) { m.textContent = 'Blocked: ' + c.errors.slice(0, 3).join('; '); return; }
+        var baseVer = (CX.base && (CX.base.codexVersion || CX.base.version)) || '1.0.0';
+        var prevVer = (CX.override && CX.override.codexVersion) || baseVer;
+        var by = 'admin-console';
+        try { var sess = JSON.parse(sessionStorage.getItem('frogAdmin') || '{}'); if (sess.u) by = sess.u; } catch (e) {}
+        var doc = {
+            file: CX.file,
+            codexVersion: cxBump(prevVer),
+            baseVersion: baseVer,
+            data: c.partial,
+            updatedBy: by,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        try {
+            await S.fs.collection('codexOverrides').doc(CX.file).set(doc);
+            CX.override = doc;
+            cxPaintGrid();
+            m.textContent = 'Saved override v' + doc.codexVersion + ' (' + c.leafCount + ' edited field(s)).';
+            msg('Override saved.');
+        } catch (e) {
+            m.textContent = 'Save failed: ' + ((e && e.code ? '[' + e.code + '] ' : '') + (e && e.message ? e.message : e))
+                + ' — if permission-denied, paste the codexOverrides block into the archfrogunified Firestore rules (see firestore.rules note).';
+        }
+    }
+    async function cxDelete() {
+        var m = $('cxMsg'); m.textContent = '';
+        try {
+            await S.fs.collection('codexOverrides').doc(CX.file).delete();
+            CX.override = null;
+            cxPaintGrid();
+            m.textContent = 'Override deleted — pinned base is effective again.';
+        } catch (e) { m.textContent = 'Delete failed: ' + (e && e.message ? e.message : e); }
+    }
+    function cxExport() {
+        var eff = cxEffective();
+        if (!eff) return;
+        eff.codexVersion = (CX.override && CX.override.codexVersion) || eff.codexVersion;
+        var blob = new Blob([JSON.stringify(eff, null, 2)], { type: 'application/json' });
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = CX.file + '.effective.json';
+        a.click();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+    }
+
+    window.FrogAdmin = {
+        login: login, logout: logout, refresh: refresh,
+        cxLoad: cxLoad, cxSave: cxSave, cxDelete: cxDelete, cxExport: cxExport,
+        siteApprove: siteApprove, siteUpgrade: siteUpgrade,
+        spaceApprove: spaceApprove, spaceReject: spaceReject,
+        specSetStatus: specSetStatus, specUpgrade: specUpgrade, specUpgradeReject: specUpgradeReject,
+        specBundle: specBundle, specBundleReject: specBundleReject
+    };
+})();
+</script>
+</body>
+</html>

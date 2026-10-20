@@ -2,7 +2,7 @@
 <html lang="en" class="scroll-smooth dark">
 <head>
     <script>
-        // Maintenance mode toggle (code-only). Default: ON.
+        // Maintenance mode toggle (code-only). Default: OFF.
         const MAINTENANCE_MODE = false;
         if (MAINTENANCE_MODE) {
             window.location.replace('./maintenance.html');
@@ -224,6 +224,61 @@
             box-shadow: none !important;
         }
         .modal-download-btn:disabled::before { content: none; }
+
+        /* Modern Card Loading Animation for Download Buttons */
+        @keyframes modernShimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(200%); }
+        }
+        @keyframes pulseGlow {
+            0%, 100% {
+                border-color: rgba(180, 240, 42, 0.4);
+                box-shadow: 0 0 16px rgba(180, 240, 42, 0.16), inset 0 0 14px rgba(180, 240, 42, 0.05);
+            }
+            50% {
+                border-color: rgba(180, 240, 42, 0.85);
+                box-shadow: 0 0 28px rgba(180, 240, 42, 0.4), inset 0 0 20px rgba(180, 240, 42, 0.16);
+            }
+        }
+        @keyframes cardLoadingBar {
+            0% { left: -40%; width: 30%; }
+            50% { left: 40%; width: 50%; }
+            100% { left: 100%; width: 30%; }
+        }
+        .modal-download-btn.btn-loading,
+        .modal-download-btn.btn-loading:disabled {
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(135deg, rgba(22, 27, 34, 0.95) 0%, rgba(30, 38, 48, 0.95) 100%) !important;
+            border: 1px solid rgba(180, 240, 42, 0.45) !important;
+            color: #B4F02A !important;
+            opacity: 1 !important;
+            filter: none !important;
+            cursor: not-allowed !important;
+            pointer-events: none !important;
+            user-select: none;
+            box-shadow: 0 0 20px rgba(180, 240, 42, 0.15), inset 0 0 15px rgba(180, 240, 42, 0.05);
+            animation: pulseGlow 2.5s ease-in-out infinite;
+        }
+        .modal-download-btn.btn-loading::before,
+        .modal-download-btn.btn-loading:disabled::before {
+            content: '' !important;
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(180, 240, 42, 0.22), transparent);
+            transform: skewX(-20deg);
+            animation: modernShimmer 2s infinite ease-in-out;
+        }
+        .modal-download-btn.btn-loading::after {
+            content: '';
+            position: absolute;
+            bottom: 0; left: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #B4F02A, #C9F458, transparent);
+            box-shadow: 0 0 10px #B4F02A;
+            animation: cardLoadingBar 2s infinite ease-in-out;
+        }
         .modal-stat-box {
             flex: 1;
             padding: 12px;
@@ -545,7 +600,7 @@
             { name: "SPACE FROG",   icon: "ph-bounding-box",        desc: "Smart space programming & adjacency logic.",             status: "Available now",      color: "frog" },
             { name: "SITE FROG",    icon: "ph-map-trifold",         desc: "Smart Site analysis & automated earthworks data.",       status: "Available now",      color: "frog" },
             { name: "3D FROG",      icon: "ph-cube",                desc: "Lightweight 2D/3D modeling bridging tools.",             status: "Under Construction", color: "slate-400" },
-            { name: "SPEC FROG",    icon: "ph-article",             desc: "Automated material specifications and computation.",     status: "Under Construction", color: "slate-400" },
+            { name: "SPECS FROG",   icon: "ph-article",             desc: "Automated material specifications, BOQ builder & scheduling.", status: "Available now", color: "frog" },
             { name: "FROG REVIEW",  icon: "ph-book-open",           desc: "Smart reviewer for board exams, quizzes, and general mastery.", status: "Under Construction", color: "slate-400" },
             { name: "FROG ADMIN",   icon: "ph-identification-card", desc: "Student & Project management toolset.",                 status: "Under Construction", color: "slate-400" },
             { name: "FROG CLOUD",   icon: "ph-cloud-arrow-up",      desc: "Centralized ecosystem data hosting.",                   status: "Under Construction", color: "slate-400" }
@@ -553,7 +608,6 @@
 
         // ── Day counters ─────────────────────────────────────────────────
         const SITE_FROG_DAY1_LOCAL = new Date('2026-06-10T00:00:00');
-        const SPEC_FROG_DAY1_LOCAL = new Date('2026-07-16T00:00:00');
 
         function getSiteFrogDayNumber() {
             const now = new Date();
@@ -563,30 +617,13 @@
             return Math.max(1, Math.floor((nowMidnight - startMidnight) / msPerDay) + 1);
         }
 
-        function getSpecFrogDayNumber() {
-            const now = new Date();
-            const msPerDay = 1000 * 60 * 60 * 24;
-            const nowMidnight  = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            const startMidnight = new Date(SPEC_FROG_DAY1_LOCAL.getFullYear(), SPEC_FROG_DAY1_LOCAL.getMonth(), SPEC_FROG_DAY1_LOCAL.getDate());
-            const days = Math.floor((nowMidnight - startMidnight) / msPerDay) + 1;
-            return days < 1 ? 'Dev Starts July 16' : 'Day ' + days;
-        }
-
-        function updateSiteFrogDayCounters() {
-            const siteEl = document.querySelector('.site-frog-day-counter[data-app="SITE FROG"]');
-            if (siteEl) siteEl.textContent = String(getSiteFrogDayNumber());
-            const specEl = document.querySelector('.site-frog-day-counter[data-app="SPEC FROG"]');
-            if (specEl) specEl.textContent = String(getSpecFrogDayNumber());
-        }
-
         // ── Build Tool Grid ──────────────────────────────────────────────
         const toolGrid = document.getElementById('toolGrid');
         tools.forEach((tool, index) => {
-            const isSpecFrog   = tool.name === 'SPEC FROG';
-            const isAppWithCounter = isSpecFrog;
+            const isSpecFrog   = tool.name === 'SPECS FROG' || tool.name === 'SPEC FROG';
             const isSpaceFrog  = tool.name === 'SPACE FROG';
             const isSiteFrog   = tool.name === 'SITE FROG';
-            const isActiveTool = isSpaceFrog || isSiteFrog;
+            const isActiveTool = isSpaceFrog || isSiteFrog || isSpecFrog;
             const isDisabled   = !isActiveTool;
 
             const div = document.createElement('div');
@@ -595,12 +632,10 @@
                     ? 'opacity-50 cursor-not-allowed grayscale pointer-events-none border-white/10 bg-card'
                     : 'cursor-pointer border-white/10 bg-card hover:border-frog/60 hover:bg-frog/10'
             } ${
-                isActiveTool ? 'tool-card-active animate-[neonPulse_3s_ease-in-out_infinite]' :
-                isAppWithCounter ? 'border-white/10 site-frog-progress' : ''
+                isActiveTool ? 'tool-card-active animate-[neonPulse_3s_ease-in-out_infinite]' : ''
             }`;
 
             div.innerHTML = `
-                ${isAppWithCounter ? `<div class="absolute top-0 left-0 -translate-x-0.5 -translate-y-0.5 px-2 py-0.5 rounded-br-xl rounded-tl-xl bg-white/10 border border-white/20 text-white/90  text-[9px] font-bold tracking-widest" style="box-shadow: 0 0 18px rgba(255,255,255,0.12);" data-app="${tool.name}"><span class="site-frog-day-counter" data-app="${tool.name}">${getSpecFrogDayNumber()}</span></div>` : ''}
                 <div class="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl border ${
                     isActiveTool ? 'border-frog/30 bg-frog/10' : 'border-white/10 bg-white/5'
                 } flex items-center justify-center overflow-hidden">
@@ -608,6 +643,8 @@
                         ? `<img src="./Space Frog.webp" alt="Space Frog" class="w-full h-full object-cover rounded-2xl transition-transform group-hover:scale-110" />`
                         : isSiteFrog
                         ? `<img src="./Site Frog.webp" alt="Site Frog" class="w-full h-full object-cover rounded-2xl transition-transform group-hover:scale-110" />`
+                        : isSpecFrog
+                        ? `<img src="./Spec Frog.png" alt="Specs Frog" class="w-full h-full object-cover rounded-2xl transition-transform group-hover:scale-110" />`
                         : `<i class="ph-bold ${tool.icon} text-xl sm:text-2xl ${
                         isActiveTool ? 'text-frog' : 'text-gray-400'
                     } transition-transform group-hover:scale-110"></i>`
@@ -623,8 +660,6 @@
                 <div class="mt-2 text-[11px] uppercase tracking-widest font-bold ${isActiveTool ? 'text-frog' : 'text-gray-400'}">
                     ${isActiveTool
                         ? `<span class="inline-flex items-center gap-1.5"><span class="w-1.5 h-1.5 rounded-full bg-frog animate-pulse"></span>${tool.status}</span>`
-                        : isAppWithCounter
-                        ? `<span class="inline-flex items-center gap-2"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-gray-400 animate-spin" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4" /><path d="M12 18v4" /><path d="M4.93 4.93l2.83 2.83" /><path d="M16.24 16.24l2.83 2.83" /><path d="M2 12h4" /><path d="M18 12h4" /><path d="M4.93 19.07l2.83-2.83" /><path d="M16.24 7.76l2.83-2.83" /><circle cx="12" cy="12" r="4" /></svg> WORK IN PROGRESS</span>`
                         : `<span class="inline-flex items-center gap-2"><svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 text-gray-400 animate-spin" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4" /><path d="M12 18v4" /><path d="M4.93 4.93l2.83 2.83" /><path d="M16.24 16.24l2.83 2.83" /><path d="M2 12h4" /><path d="M18 12h4" /><path d="M4.93 19.07l2.83-2.83" /><path d="M16.24 7.76l2.83-2.83" /><circle cx="12" cy="12" r="4" /></svg> Under Construction</span>`
                     }
                 </div>
@@ -636,68 +671,77 @@
             toolGrid.appendChild(div);
         });
 
-        updateSiteFrogDayCounters();
-        setInterval(updateSiteFrogDayCounters, 60 * 1000);
-
         // ── Modal System ─────────────────────────────────────────────────
         const modalOverlay = document.getElementById('modalOverlay');
         const modalContent = document.getElementById('modalContent');
         let countdownInterval;
 
         // ── Download Lock Toggle ─────────────────────────────────────────
-        // Downloads lock persists in localStorage. Toggle anytime with:
-        //   window.__frogToggleDownloads()            // flips lock
-        //   window.__frogSetDownloadsLocked(true)     // force lock ON
-        //   window.__frogSetDownloadsLocked(false)    // force lock OFF
-        window.__frogDownloadsLocked = window.__frogDownloadsLocked || function() {
-            return localStorage.getItem('frogDownloadLocked') === 'true';
+        window.__frogDownloadsLocked = function() {
+            return true;
         };
-        window.__frogSetDownloadsLocked = window.__frogSetDownloadsLocked || function(locked) {
-            localStorage.setItem('frogDownloadLocked', locked ? 'true' : 'false');
-            return window.__frogDownloadsLocked();
+        window.__frogSetDownloadsLocked = function() {
+            return true;
         };
-        window.__frogToggleDownloads = window.__frogToggleDownloads || function() {
-            return window.__frogSetDownloadsLocked(!window.__frogDownloadsLocked());
+        window.__frogToggleDownloads = function() {
+            return true;
         };
 
         function openToolModal(index) {
             const tool = tools[index];
+            const isSpecFrog   = tool.name === 'SPECS FROG' || tool.name === 'SPEC FROG';
+            const isSpaceFrog  = tool.name === 'SPACE FROG';
+            const isSiteFrog   = tool.name === 'SITE FROG';
+            const isActiveTool = isSpaceFrog || isSiteFrog || isSpecFrog;
+
             let actionHtml = '';
-            if (tool.name === 'SPACE FROG' || tool.name === 'SITE FROG') {
-                const downloadsLocked = window.__frogDownloadsLocked();
-                const androidBtn = tool.name === 'SPACE FROG'
+            if (isActiveTool) {
+                const androidBtn = (isSpaceFrog || isSpecFrog)
                     ? `<button
                            type="button"
-                           class="modal-download-btn"
+                           class="modal-download-btn btn-loading"
                            style="margin-top: 8px;"
-                           ${downloadsLocked ? 'disabled aria-disabled="true" tabindex="-1"' : `onclick="event.preventDefault(); window.__frogTcStartDownload && window.__frogTcStartDownload('${tool.name}', 'apk');"`}>
-                            <i class="ph-bold ph-download-simple" style="font-size:1.2rem;"></i>
+                           disabled
+                           aria-disabled="true"
+                           tabindex="-1">
+                            <i class="ph-bold ph-circle-notch animate-spin" style="font-size:1.2rem;"></i>
                             <span>Download for Android</span>
-                            <span style="font-size:10px;opacity:0.6;font-weight:600;letter-spacing:0.1em;">FREE</span>
+                            <span style="font-size:10px;opacity:0.8;font-weight:700;letter-spacing:0.1em;background:rgba(180,240,42,0.15);padding:2px 6px;border-radius:4px;margin-left:auto;">FREE</span>
                         </button>`
                     : `<button
                            type="button"
-                           class="modal-download-btn"
-                           style="margin-top: 8px; opacity: 0.5; cursor: not-allowed; filter: grayscale(100%);"
-                           disabled>
-                            <i class="ph-bold ph-download-simple" style="font-size:1.2rem;"></i>
+                           class="modal-download-btn btn-loading"
+                           style="margin-top: 8px;"
+                           disabled
+                           aria-disabled="true"
+                           tabindex="-1">
+                            <i class="ph-bold ph-circle-notch animate-spin" style="font-size:1.2rem;"></i>
                             <span>Download for Android</span>
                             <span style="font-size:10px;opacity:0.6;font-weight:600;letter-spacing:0.1em;">FREE</span>
-                            <span style="font-size:10px;font-weight:700;letter-spacing:0.1em;background:rgba(0,0,0,0.2);padding:2px 6px;border-radius:4px;margin-left:auto;">COMING SOON</span>
+                            <span style="font-size:10px;font-weight:700;letter-spacing:0.1em;background:rgba(0,0,0,0.3);padding:2px 6px;border-radius:4px;margin-left:auto;">COMING SOON</span>
                         </button>`;
                 actionHtml = `
                     <div class="w-full flex flex-col gap-3 relative select-none">
                         <button
-                           id="${tool.name === 'SPACE FROG' ? 'spaceFrogDownloadBtn' : 'siteFrogDownloadBtn'}"
+                           id="${isSpaceFrog ? 'spaceFrogDownloadBtn' : isSiteFrog ? 'siteFrogDownloadBtn' : 'specsFrogDownloadBtn'}"
                            type="button"
-                           ${downloadsLocked ? 'disabled aria-disabled="true" tabindex="-1"' : `onclick="event.preventDefault(); window.__frogTcStartDownload && window.__frogTcStartDownload('${tool.name}', 'exe');"`}
-                           class="modal-download-btn">
-                            <i class="ph-bold ph-download-simple" style="font-size:1.2rem;"></i>
+                           disabled
+                           aria-disabled="true"
+                           tabindex="-1"
+                           class="modal-download-btn btn-loading">
+                            <i class="ph-bold ph-circle-notch animate-spin" style="font-size:1.2rem;"></i>
                             <span>Download for Windows</span>
-                            <span style="font-size:10px;opacity:0.6;font-weight:600;letter-spacing:0.1em;">FREE</span>
+                            <span style="font-size:10px;opacity:0.8;font-weight:700;letter-spacing:0.1em;background:rgba(180,240,42,0.15);padding:2px 6px;border-radius:4px;margin-left:auto;">FREE</span>
                         </button>
                         ${androidBtn}
-                        <p style="text-align:center;font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:0.05em;margin-top:12px;">By downloading, you agree to our Terms & Conditions</p>
+                        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-top:6px;">
+                            <span style="position:relative;display:flex;height:8px;width:8px;">
+                                <span style="position:absolute;display:inline-flex;height:100%;width:100%;border-radius:9999px;background:#B4F02A;opacity:0.75;animation:ping 1.2s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+                                <span style="position:relative;display:inline-flex;border-radius:9999px;height:8px;width:8px;background:#B4F02A;"></span>
+                            </span>
+                            <span style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.2em;color:#B4F02A;text-transform:uppercase;">Uploading</span>
+                        </div>
+                        <p style="text-align:center;font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:0.05em;margin-top:2px;">By downloading, you agree to our Terms & Conditions</p>
                     </div>
                 `;
             } else {
@@ -710,13 +754,22 @@
                 `;
             }
 
-            const isActiveTool = tool.name === 'SPACE FROG' || tool.name === 'SITE FROG';
-            const appVersion = tool.name === 'SITE FROG' ? '1.0.7' : tool.name === 'SPACE FROG' ? '2.1.0' : null;
-            const fileSize = tool.name === 'SPACE FROG' ? '92 MB' : '446 MB';
+            let appVersion = '';
+            let fileSize = '';
+            if (isSpaceFrog) {
+                appVersion = 'Version Aristotle';
+                fileSize = '104 MB';
+            } else if (isSiteFrog) {
+                appVersion = 'Version Aristotle';
+                fileSize = '50 MB';
+            } else if (isSpecFrog) {
+                appVersion = 'version 1.0.0';
+                fileSize = '75 MB';
+            }
 
             // Feature chips per app
             let featureChips = '';
-            if (tool.name === 'SPACE FROG') {
+            if (isSpaceFrog) {
                 featureChips = `
                     <span class="modal-feature-chip"><i class="ph-bold ph-bounding-box" style="font-size:12px;color:#B4F02A;"></i>Space Programming</span>
                     <span class="modal-feature-chip"><i class="ph-bold ph-ruler" style="font-size:12px;color:#B4F02A;"></i>NBCP Compliance</span>
@@ -727,7 +780,7 @@
                     <span class="modal-feature-chip"><i class="ph-bold ph-coins" style="font-size:12px;color:#B4F02A;"></i>Cost Estimator</span>
                     <span class="modal-feature-chip"><i class="ph-bold ph-plus" style="font-size:12px;color:#B4F02A;"></i>More</span>
                 `;
-            } else if (tool.name === 'SITE FROG') {
+            } else if (isSiteFrog) {
                 featureChips = `
                     <span class="modal-feature-chip"><i class="ph-bold ph-lightning" style="font-size:12px;color:#B4F02A;"></i>Auto Computation</span>
                     <span class="modal-feature-chip"><i class="ph-bold ph-ruler" style="font-size:12px;color:#B4F02A;"></i>NBCP Compliance</span>
@@ -737,14 +790,26 @@
                     <span class="modal-feature-chip"><i class="ph-bold ph-thermometer" style="font-size:12px;color:#B4F02A;"></i>UHI Analysis</span>
                     <span class="modal-feature-chip"><i class="ph-bold ph-plus" style="font-size:12px;color:#B4F02A;"></i>More</span>
                 `;
+            } else if (isSpecFrog) {
+                featureChips = `
+                    <span class="modal-feature-chip"><i class="ph-bold ph-calculator" style="font-size:12px;color:#B4F02A;"></i>Smart BOQ builder</span>
+                    <span class="modal-feature-chip"><i class="ph-bold ph-calendar-check" style="font-size:12px;color:#B4F02A;"></i>Construction Schedule</span>
+                    <span class="modal-feature-chip"><i class="ph-bold ph-users-three" style="font-size:12px;color:#B4F02A;"></i>Manpower Schedule</span>
+                    <span class="modal-feature-chip"><i class="ph-bold ph-arrows-clockwise" style="font-size:12px;color:#B4F02A;"></i>Automated weekly material prices update</span>
+                    <span class="modal-feature-chip"><i class="ph-bold ph-chart-line-up" style="font-size:12px;color:#B4F02A;"></i>Smart Analytics</span>
+                    <span class="modal-feature-chip"><i class="ph-bold ph-chart-bar" style="font-size:12px;color:#B4F02A;"></i>GANTT chart</span>
+                    <span class="modal-feature-chip"><i class="ph-bold ph-plus" style="font-size:12px;color:#B4F02A;"></i>More</span>
+                `;
             }
 
             // Stat boxes removed per app
 
-            const iconHtml = tool.name === 'SPACE FROG'
+            const iconHtml = isSpaceFrog
                 ? `<img src="./Space Frog.webp" alt="Space Frog" style="width:100%;height:100%;object-fit:cover;border-radius:1rem;" />`
-                : tool.name === 'SITE FROG'
+                : isSiteFrog
                 ? `<img src="./Site Frog.webp" alt="Site Frog" style="width:100%;height:100%;object-fit:cover;border-radius:1rem;" />`
+                : isSpecFrog
+                ? `<img src="./Spec Frog.png" alt="Specs Frog" style="width:100%;height:100%;object-fit:cover;border-radius:1rem;" />`
                 : `<i class="ph-bold ${tool.icon}" style="font-size:2rem;color:#B4F02A;"></i>`;
 
             modalContent.innerHTML = `
@@ -775,7 +840,7 @@
                                         </div>
                                         <div class="modal-version-badge">
                                             <i class="ph-bold ph-tag" style="font-size:9px;"></i>
-                                            v${appVersion}
+                                            ${appVersion}
                                         </div>
                                     ` : `
                                         <div style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:rgba(100,100,100,0.12);border:1px solid rgba(100,100,100,0.2);">
